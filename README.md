@@ -7,7 +7,9 @@ A production-grade, secure authentication and authorization REST API built with 
 ## 🚀 Key Features
 
 - **HTTPS / SSL (TLS) Encryption**: Server runs exclusively over HTTPS on port `8443` using a local PKCS#12 RSA keystore (`keystore.p12`).
-- **Stateless JWT Authentication**: Secure token generation, validation, and claim extraction using JJWT (`0.12.6`).
+- **Dynamic Credentials-Based JWT Authentication**:
+  - JWT tokens are generated dynamically upon user authentication using login credentials (username/email and password).
+  - No external `jwt.*` properties needed in `application.properties`.
 - **Spring Security Architecture**:
   - `SecurityFilterChain` configuring stateless session policy.
   - Custom `JwtAuthenticationFilter` validating Bearer tokens on protected endpoints.
@@ -27,7 +29,7 @@ src/main/java/com/sayani/secure_auth_api/
 │   └── DemoController.java      # Protected test endpoints (requires JWT)
 ├── dto/
 │   ├── AuthResponse.java        # Standardized JWT response payload
-│   ├── LoginRequest.java        # Login DTO with validation
+│   ├── LoginRequest.java        # Login DTO with validation (accepts username/email & password)
 │   └── RegisterRequest.java     # User registration DTO
 ├── entity/
 │   ├── Role.java                # User role enum (ROLE_USER, ROLE_ADMIN)
@@ -67,10 +69,6 @@ spring.jpa.hibernate.ddl-auto=update
 # H2 Console
 spring.h2.console.enabled=true
 spring.h2.console.path=/h2-console
-
-# JWT Configuration
-jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-jwt.expiration-ms=86400000
 ```
 
 ---
@@ -105,7 +103,7 @@ curl -k -X POST https://localhost:8443/api/v1/auth/register \
 
 ---
 
-### 2. Login
+### 2. Login (Credentials-Based JWT Generation)
 ```bash
 curl -k -X POST https://localhost:8443/api/v1/auth/login \
   -H "Content-Type: application/json" \
@@ -136,12 +134,4 @@ curl -k -X GET https://localhost:8443/api/v1/demo/hello \
   "status": "SUCCESS",
   "message": "Hello! You have accessed a secure endpoint protected by SSL/TLS and JWT!"
 }
-```
-
----
-
-### 5. Access User Profile Endpoint
-```bash
-curl -k -X GET https://localhost:8443/api/v1/demo/profile \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..."
 ```

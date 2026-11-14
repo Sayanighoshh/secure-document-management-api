@@ -1,6 +1,5 @@
 package com.sayani.secure_auth_api.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,10 +12,17 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class LoginRequest {
 
-    @NotBlank(message = "Email cannot be blank")
-    @Email(message = "Email must be a valid email address")
+    // Can be sent as "username" or "email"
+    private String username;
     private String email;
 
     @NotBlank(message = "Password cannot be blank")
     private String password;
+
+    public String getUsername() {
+        if (username != null && !username.isBlank()) {
+            return username;
+        }
+        return email;
+    }
 }

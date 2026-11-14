@@ -10,8 +10,12 @@ import com.sayani.secure_auth_api.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -23,20 +27,31 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email is already registered: " + request.getEmail());
+        String email = request.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Username or email is required");
+        }
+
+        if (userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("User is already registered: " + email);
         }
 
         var user = User.builder()
                 .name(request.getName())
-                .email(request.getEmail())
+                .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.ROLE_USER)
                 .build();
 
         userRepository.save(user);
 
-        var jwtToken = jwtService.generateToken(user);
+        // Generate token based on registered user credentials
+        var jwtToken = jwtService.generateTokenFromCredentials(
+                user.getUsername(),
+                request.getPassword(),
+                Map.of("role", user.getRole().name())
+        );
+
         return AuthResponse.builder()
                 .token(jwtToken)
                 .tokenType("Bearer")
@@ -48,17 +63,31 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
+        String loginIdentifier = request.getUsername();
+        if (loginIdentifier == null || loginIdentifier.isBlank()) {
+            throw new IllegalArgumentException("Username or email is required");
+        }
+
+        // Authenticate credentials (username/email and raw password)
+        Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
+                        loginIdentifier,
                         request.getPassword()
                 )
         );
 
-        var user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        var jwtToken = jwtService.generateToken(user);
+        var user = userRepository.findByEmail(loginIdentifier)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+
+        // Generate JWT based on verified login credentials (username and password)
+        var jwtToken = jwtService.generateTokenFromCredentials(
+                user.getUsername(),
+                request.getPassword(),
+                Map.of("role", user.getRole().name())
+        );
+
         return AuthResponse.builder()
                 .token(jwtToken)
                 .tokenType("Bearer")
