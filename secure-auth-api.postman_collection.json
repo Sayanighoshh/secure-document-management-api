@@ -1,13 +1,13 @@
 {
 	"info": {
 		"_postman_id": "secure-auth-api-collection",
-		"name": "Secure Auth API (SSL, 2FA, OTP & JWT)",
-		"description": "Postman Collection for testing Secure Auth API with SSL/TLS, Credentials-based JWT, Registration Email, and Two-Factor Authentication (OTP).",
+		"name": "Secure Auth API (SSL, 2FA, OTP, Auto-Password & Reset)",
+		"description": "Comprehensive Postman collection for Secure Auth API featuring SSL/TLS, auto-generated registration credentials, Forgot/Reset Password workflows with email notifications, and Two-Factor Authentication (OTP).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "1. Register User (Triggers Registration Email)",
+			"name": "1. Register User (Auto-Generates Password & Sends Email)",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -18,7 +18,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"name\": \"Sayani\",\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\"\n}"
+					"raw": "{\n  \"name\": \"Sayani Ghosh\",\n  \"email\": \"sayani@example.com\"\n}"
 				},
 				"url": {
 					"raw": "https://localhost:8443/api/v1/auth/register",
@@ -37,7 +37,7 @@
 			}
 		},
 		{
-			"name": "2. Login from Device-A (First Time -> Triggers OTP)",
+			"name": "2. Forgot Password (Dispatches Reset OTP to Email)",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -48,7 +48,67 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-A\"\n}"
+					"raw": "{\n  \"email\": \"sayani@example.com\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/forgot-password",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"forgot-password"
+					]
+				}
+			}
+		},
+		{
+			"name": "3. Reset Password (Verify OTP & Set New Password)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"otp\": \"PASTE_6_DIGIT_RESET_OTP_HERE\",\n  \"newPassword\": \"NewSecurePassword@2026\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/reset-password",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"reset-password"
+					]
+				}
+			}
+		},
+		{
+			"name": "4. Login with New Password (Device-A -> Triggers 2FA)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"NewSecurePassword@2026\",\n  \"deviceId\": \"device-A\"\n}"
 				},
 				"url": {
 					"raw": "https://localhost:8443/api/v1/auth/login",
@@ -67,7 +127,7 @@
 			}
 		},
 		{
-			"name": "3. Verify OTP & Trust Device-A (Returns JWT)",
+			"name": "5. Verify 2FA OTP & Trust Device-A (Returns JWT)",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -78,7 +138,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"otp\": \"PASTE_6_DIGIT_OTP_HERE\",\n  \"deviceId\": \"device-A\"\n}"
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"otp\": \"PASTE_2FA_OTP_HERE\",\n  \"deviceId\": \"device-A\"\n}"
 				},
 				"url": {
 					"raw": "https://localhost:8443/api/v1/auth/verify-otp",
@@ -97,7 +157,7 @@
 			}
 		},
 		{
-			"name": "4. Login from Trusted Device-A (Direct Login -> Returns JWT)",
+			"name": "6. Login from Trusted Device-A (Direct Login -> Returns JWT)",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -108,7 +168,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-A\"\n}"
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"NewSecurePassword@2026\",\n  \"deviceId\": \"device-A\"\n}"
 				},
 				"url": {
 					"raw": "https://localhost:8443/api/v1/auth/login",
@@ -127,7 +187,7 @@
 			}
 		},
 		{
-			"name": "5. Login from Different Device-B (Alerts & Sends OTP to User)",
+			"name": "7. Login from Different Device-B (Alerts & Sends OTP to User)",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -138,7 +198,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-B\"\n}"
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"NewSecurePassword@2026\",\n  \"deviceId\": \"device-B\"\n}"
 				},
 				"url": {
 					"raw": "https://localhost:8443/api/v1/auth/login",
@@ -157,7 +217,7 @@
 			}
 		},
 		{
-			"name": "6. Access Protected Endpoint (/demo/hello)",
+			"name": "8. Protected Endpoint - Hello (Requires Bearer Token)",
 			"request": {
 				"method": "GET",
 				"header": [
@@ -183,7 +243,7 @@
 			}
 		},
 		{
-			"name": "7. Access User Profile Endpoint (/demo/profile)",
+			"name": "9. Protected Endpoint - Profile (Requires Bearer Token)",
 			"request": {
 				"method": "GET",
 				"header": [
