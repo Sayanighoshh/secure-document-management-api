@@ -1,6 +1,6 @@
-# Secure Auth REST API (Spring Boot & SSL/TLS, 2FA/OTP, Auto-Password & Reset)
+# Secure Auth REST API (Spring Boot, SSL/TLS, 2FA/OTP, 30-Day Token & Auto-Password)
 
-A production-grade, secure authentication and authorization REST API built with **Spring Boot**, **Spring Security**, **Two-Factor Authentication (2FA / OTP)**, **Automated Password Generation**, **Forgot/Reset Password Workflow**, **Email Notification Service**, **JSON Web Tokens (JWT)**, and **HTTPS / SSL (TLS)** using an RSA PKCS#12 Keystore.
+A production-grade, secure authentication and authorization REST API built with **Spring Boot**, **Spring Security**, **Two-Factor Authentication (2FA / OTP)**, **Automated Password Generation**, **Forgot/Reset Password Workflow**, **30-Day Expiry JWT Tokens**, **Email Notification Service**, and **HTTPS / SSL (TLS)** using an RSA PKCS#12 Keystore.
 
 ---
 
@@ -12,26 +12,31 @@ A production-grade, secure authentication and authorization REST API built with 
   - Welcome email is dispatched with the user's username/email and auto-generated credentials.
 - **Forgot Password & Reset Password Workflow**:
   - **Forgot Password**: Accepts user's registered email, generates a secure 6-digit reset OTP (valid for 5 minutes), and sends a verification email.
-  - **Reset Password**: Validates the 6-digit OTP, updates to the new BCrypt-hashed password, clears the OTP, and sends a professional confirmation email alerting the user of the successful change.
-- **Two-Factor Authentication (2FA) & Device Recognition**:
-  - Automatically identifies user devices via `deviceId`.
-  - When logging in from a recognized/trusted device, direct JWT authentication is granted.
-  - When an unrecognized or different device attempts login, a cryptographically secure 6-digit OTP is generated (valid for 5 minutes) and dispatched to the registered user's email.
+  - **Reset Password**: Validates the 6-digit OTP, updates to the new BCrypt-hashed password, clears the OTP, and sends a confirmation email.
+- **Two-Factor Authentication (2FA) & 30-Day Access Token**:
+  - Unrecognized devices trigger a 6-digit OTP dispatched to the registered user's email.
+  - Verifying the OTP (`/api/v1/auth/verify-otp`) trusts the device and issues a **30-day JWT Bearer token**.
+- **Lightweight Profile-Only Login Response**:
+  - Once authenticated, `/api/v1/auth/login` returns only the clean profile fields:
+    ```json
+    {
+      "name": "Sayani Ghosh",
+      "email": "ghoshsayani008@gmail.com",
+      "role": "ROLE_USER",
+      "message": "Authentication successful (Recognized Device)",
+      "twoFactorRequired": false,
+      "deviceId": "device-A"
+    }
+    ```
+- **Login with 30-Day Token**:
+  - Clients can log in directly using the 30-day Bearer token either via the `Authorization: Bearer <token>` header or in the request body.
 - **Email Service**:
   - **Account Registration**: Dispatches a welcome confirmation email with user credentials.
   - **Forgot Password OTP**: Dispatches verification code for password reset.
   - **Password Changed Notification**: Real-time security confirmation notification upon password update.
   - **Security Alerts & 2FA OTP**: Sends real-time security alerts with the OTP code when new device logins are detected.
-  - In development/testing, all dispatched emails & OTP codes are logged prominently to the terminal console so testing is seamless even without an external SMTP server.
-- **Dynamic Credentials-Based JWT Authentication**:
-  - JWT tokens are generated dynamically upon user authentication without needing external static properties in `application.properties`.
-- **Spring Security Architecture**:
-  - Stateless session policy (`SessionCreationPolicy.STATELESS`).
-  - Custom `JwtAuthenticationFilter` validating Bearer tokens on protected endpoints.
-  - `BCryptPasswordEncoder` for cryptographic password hashing.
-  - Role-based authorization (`ROLE_USER`, `ROLE_ADMIN`).
+  - Built-in console fallback for zero-configuration local testing + direct support for Gmail SMTP and Mailtrap.
 - **In-Memory H2 Database**: Automated entity schema generation with JPA / Hibernate.
-- **Centralized Exception Handling**: Standardized JSON responses for validation and authentication errors.
 
 ---
 
@@ -45,7 +50,7 @@ src/main/java/com/sayani/secure_auth_api/
 ├── dto/
 │   ├── AuthResponse.java            # Standardized response payload (status, token, 2FA flag)
 │   ├── ForgotPasswordRequest.java   # Request DTO for initiating password reset OTP
-│   ├── LoginRequest.java            # Login DTO with deviceId
+│   ├── LoginRequest.java            # Login DTO (supports credentials OR token login)
 │   ├── RegisterRequest.java         # User registration DTO (auto-generates password if omitted)
 │   ├── ResetPasswordRequest.java    # Request DTO with OTP and new password
 │   └── VerifyOtpRequest.java        # 2FA OTP verification DTO
@@ -59,7 +64,7 @@ src/main/java/com/sayani/secure_auth_api/
 ├── security/
 │   ├── ApplicationConfig.java       # PasswordEncoder, UserDetailsService, AuthManager
 │   ├── JwtAuthenticationFilter.java # OncePerRequestFilter for Bearer token validation
-│   ├── JwtService.java              # JJWT token generation and validation service
+│   ├── JwtService.java              # 30-day JJWT token generation and validation service
 │   └── SecurityConfig.java          # Spring Security Filter Chain configuration
 ├── service/
 │   ├── AuthService.java             # Core authentication, auto-password, OTP & reset logic
@@ -69,209 +74,136 @@ src/main/java/com/sayani/secure_auth_api/
 
 ---
 
-## ⚙️ Configuration (`src/main/resources/application.properties`)
+## 🧪 Complete API Workflow
 
-```properties
-# Application Name
-spring.application.name=secure-auth-api
-
-# SSL / HTTPS Configuration (Keystore generated via keytool)
-server.port=8443
-server.ssl.enabled=true
-server.ssl.key-store=classpath:keystore.p12
-server.ssl.key-store-password=password123
-server.ssl.key-store-type=PKCS12
-server.ssl.key-alias=authkeystore
-
-# In-Memory H2 Database
-spring.datasource.url=jdbc:h2:mem:authdb
-spring.datasource.driver-class-name=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=
-spring.jpa.hibernate.ddl-auto=update
-
-# H2 Console
-spring.h2.console.enabled=true
-spring.h2.console.path=/h2-console
-```
-
----
-
-## 🧪 Postman & cURL Testing Workflow
-
-> **Note on Self-Signed SSL Certificate:**
-> Because the keystore uses a self-signed certificate for `localhost`, add `-k` or `--insecure` with `curl`, or in **Postman Settings -> General -> Turn OFF "SSL certificate verification"**.
-> You can also import the provided **`secure-auth-api.postman_collection.json`** directly into Postman!
-
-### Step 1: Register User (Auto-Generates Password & Sends Email)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
+### Step 1: Register User (Auto-Generates Password)
+* **POST** `https://localhost:8443/api/v1/auth/register`
+* **Body**:
+  ```json
+  {
     "name": "Sayani Ghosh",
-    "email": "sayani@example.com"
-  }'
-```
-**Response (`201 CREATED`):**
-```json
-{
-  "status": "REGISTERED",
-  "name": "Sayani Ghosh",
-  "email": "sayani@example.com",
-  "role": "ROLE_USER",
-  "message": "User registered successfully. Login credentials sent to your registered email."
-}
-```
-*Check terminal output: An email is logged showing the auto-generated password (e.g., `Sayani@84920`).*
+    "email": "ghoshsayani008@gmail.com"
+  }
+  ```
+* **Response (`201 CREATED`)**:
+  ```json
+  {
+    "status": "REGISTERED",
+    "name": "Sayani Ghosh",
+    "email": "ghoshsayani008@gmail.com",
+    "role": "ROLE_USER",
+    "message": "User registered successfully. Login credentials sent to your registered email."
+  }
+  ```
 
 ---
 
-### Step 2: Forgot Password (Request Reset OTP)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/forgot-password \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com"
-  }'
-```
-**Response (`200 OK`):**
-```json
-{
-  "status": "OTP_SENT",
-  "name": "Sayani Ghosh",
-  "email": "sayani@example.com",
-  "message": "Password reset OTP has been sent to your registered email."
-}
-```
-*Check terminal output: An email is logged containing the 6-digit Reset OTP code.*
-
----
-
-### Step 3: Reset Password (Verify OTP & Set New Password)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/reset-password \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com",
-    "otp": "<6_DIGIT_OTP_FROM_CONSOLE>",
-    "newPassword": "NewSecurePassword@2026"
-  }'
-```
-**Response (`200 OK`):**
-```json
-{
-  "status": "SUCCESS",
-  "name": "Sayani Ghosh",
-  "email": "sayani@example.com",
-  "message": "Your password has been changed successfully. You can now log in with your new password."
-}
-```
-*Check terminal output: A confirmation email is logged confirming password change.*
-
----
-
-### Step 4: Login with New Password from Device-A (Triggers 2FA OTP)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com",
-    "password": "NewSecurePassword@2026",
+### Step 2: First-Time Login (Device-A $\rightarrow$ Triggers 2FA OTP)
+* **POST** `https://localhost:8443/api/v1/auth/login`
+* **Body**:
+  ```json
+  {
+    "email": "ghoshsayani008@gmail.com",
+    "password": "<AUTO_GENERATED_PASSWORD_FROM_EMAIL>",
     "deviceId": "device-A"
-  }'
-```
-**Response (`200 OK`):**
-```json
-{
-  "status": "OTP_REQUIRED",
-  "name": "Sayani Ghosh",
-  "email": "sayani@example.com",
-  "twoFactorRequired": true,
-  "deviceId": "device-A",
-  "message": "Unrecognized device detected. A 6-digit OTP has been sent to your registered email."
-}
-```
+  }
+  ```
+* **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "OTP_REQUIRED",
+    "name": "Sayani Ghosh",
+    "email": "ghoshsayani008@gmail.com",
+    "twoFactorRequired": true,
+    "deviceId": "device-A",
+    "message": "Unrecognized device detected. A 6-digit OTP has been sent to your registered email."
+  }
+  ```
 
 ---
 
-### Step 5: Verify 2FA OTP & Trust Device-A (Returns JWT)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/verify-otp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com",
-    "otp": "<6_DIGIT_2FA_OTP_FROM_CONSOLE>",
+### Step 3: Verify 2FA OTP (Issues 30-Day JWT Token)
+* **POST** `https://localhost:8443/api/v1/auth/verify-otp`
+* **Body**:
+  ```json
+  {
+    "email": "ghoshsayani008@gmail.com",
+    "otp": "<6_DIGIT_OTP_FROM_CONSOLE_OR_EMAIL>",
     "deviceId": "device-A"
-  }'
-```
-**Response (`200 OK`):**
-```json
-{
-  "status": "SUCCESS",
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "tokenType": "Bearer",
-  "name": "Sayani Ghosh",
-  "email": "sayani@example.com",
-  "role": "ROLE_USER",
-  "deviceId": "device-A",
-  "twoFactorRequired": false,
-  "message": "Two-Factor Authentication verified successfully. Device registered."
-}
-```
+  }
+  ```
+* **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "SUCCESS",
+    "token": "eyJhbGciOiJIUzI1NiJ9...",
+    "tokenType": "Bearer",
+    "name": "Sayani Ghosh",
+    "email": "ghoshsayani008@gmail.com",
+    "role": "ROLE_USER",
+    "deviceId": "device-A",
+    "twoFactorRequired": false,
+    "message": "Two-Factor Authentication verified successfully. Device registered. 30-day access token issued."
+  }
+  ```
+  *(Save this `token` — it is valid for 30 days!)*
 
 ---
 
-### Step 6: Login Again from Trusted Device-A (Direct Login — No OTP Needed)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com",
-    "password": "NewSecurePassword@2026",
+### Step 4: Login from Trusted Device-A (Returns Clean Profile Response)
+* **POST** `https://localhost:8443/api/v1/auth/login`
+* **Body**:
+  ```json
+  {
+    "email": "ghoshsayani008@gmail.com",
+    "password": "<PASSWORD>",
     "deviceId": "device-A"
-  }'
-```
-**Response:** Directly returns `status: "SUCCESS"` and your JWT Bearer token!
+  }
+  ```
+* **Response (`200 OK`)**:
+  ```json
+  {
+    "name": "Sayani Ghosh",
+    "email": "ghoshsayani008@gmail.com",
+    "role": "ROLE_USER",
+    "message": "Authentication successful (Recognized Device)",
+    "twoFactorRequired": false,
+    "deviceId": "device-A"
+  }
+  ```
 
 ---
 
-### Step 7: Unrecognized Device Attempt (Device-B — Triggers Security Alert & OTP)
-```bash
-curl -k -X POST https://localhost:8443/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "sayani@example.com",
-    "password": "NewSecurePassword@2026",
-    "deviceId": "device-B"
-  }'
-```
-**Response:** Returns `status: "OTP_REQUIRED"` and sends a security alert to the registered user alerting them that an unrecognized device (`device-B`) is attempting login.
+### Step 5: Login Directly Using the 30-Day Token
+* **POST** `https://localhost:8443/api/v1/auth/login`
+* **Headers**: `Authorization: Bearer <YOUR_30_DAY_JWT_TOKEN>`
+* **Body**:
+  ```json
+  {
+    "deviceId": "device-A"
+  }
+  ```
+* **Response (`200 OK`)**:
+  ```json
+  {
+    "name": "Sayani Ghosh",
+    "email": "ghoshsayani008@gmail.com",
+    "role": "ROLE_USER",
+    "message": "Authentication successful (Recognized Device)",
+    "twoFactorRequired": false,
+    "deviceId": "device-A"
+  }
+  ```
 
 ---
 
-### Step 8: Access Protected Endpoint with JWT
-```bash
-curl -k -X GET https://localhost:8443/api/v1/demo/hello \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
-```
-**Response (`200 OK`):**
-```json
-{
-  "status": "SUCCESS",
-  "message": "Hello! You have accessed a secure endpoint protected by SSL/TLS and JWT!"
-}
-```
-
----
-
-## 🏃 Running the Application
-
-### Start Application:
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-### Run All Unit & Integration Tests:
-```powershell
-.\mvnw.cmd test
-```
+### Step 6: Access Protected Endpoints
+* **GET** `https://localhost:8443/api/v1/demo/hello`
+* **Headers**: `Authorization: Bearer <YOUR_30_DAY_JWT_TOKEN>`
+* **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "SUCCESS",
+    "message": "Hello! You have accessed a secure endpoint protected by SSL/TLS and JWT!"
+  }
+  ```

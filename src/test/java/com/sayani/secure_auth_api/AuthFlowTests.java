@@ -8,6 +8,7 @@ import com.sayani.secure_auth_api.dto.ResetPasswordRequest;
 import com.sayani.secure_auth_api.dto.VerifyOtpRequest;
 import com.sayani.secure_auth_api.entity.User;
 import com.sayani.secure_auth_api.repository.UserRepository;
+import com.sayani.secure_auth_api.security.JwtService;
 import com.sayani.secure_auth_api.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,9 @@ class AuthFlowTests {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
@@ -35,36 +39,36 @@ class AuthFlowTests {
         // 1. Register with only Full Name and Email (No password supplied)
         RegisterRequest registerRequest = RegisterRequest.builder()
                 .name("Sayani Ghosh")
-                .email("sayani@example.com")
+                .email("ghoshsayani008@gmail.com")
                 .build();
 
         AuthResponse regResponse = authService.register(registerRequest);
         assertNotNull(regResponse);
         assertEquals("REGISTERED", regResponse.getStatus());
-        assertEquals("sayani@example.com", regResponse.getEmail());
+        assertEquals("ghoshsayani008@gmail.com", regResponse.getEmail());
 
         // Verify User was saved with auto-generated password
-        User user = userRepository.findByEmail("sayani@example.com").orElse(null);
+        User user = userRepository.findByEmail("ghoshsayani008@gmail.com").orElse(null);
         assertNotNull(user);
         assertNotNull(user.getPassword());
 
         // 2. Forgot Password Request
         ForgotPasswordRequest forgotRequest = ForgotPasswordRequest.builder()
-                .email("sayani@example.com")
+                .email("ghoshsayani008@gmail.com")
                 .build();
 
         AuthResponse forgotResponse = authService.forgotPassword(forgotRequest);
         assertEquals("OTP_SENT", forgotResponse.getStatus());
 
         // Retrieve generated OTP from DB
-        User userAfterForgot = userRepository.findByEmail("sayani@example.com").orElseThrow();
+        User userAfterForgot = userRepository.findByEmail("ghoshsayani008@gmail.com").orElseThrow();
         String resetOtp = userAfterForgot.getCurrentOtp();
         assertNotNull(resetOtp);
         assertEquals(6, resetOtp.length());
 
         // 3. Reset Password with OTP
         ResetPasswordRequest resetRequest = ResetPasswordRequest.builder()
-                .email("sayani@example.com")
+                .email("ghoshsayani008@gmail.com")
                 .otp(resetOtp)
                 .newPassword("NewSecurePassword@2026")
                 .build();
@@ -73,12 +77,12 @@ class AuthFlowTests {
         assertEquals("SUCCESS", resetResponse.getStatus());
 
         // Verify OTP is cleared
-        User userAfterReset = userRepository.findByEmail("sayani@example.com").orElseThrow();
+        User userAfterReset = userRepository.findByEmail("ghoshsayani008@gmail.com").orElseThrow();
         assertNull(userAfterReset.getCurrentOtp());
 
         // 4. Login with newly created password (Device-A -> Triggers 2FA on first device)
         LoginRequest loginRequest = LoginRequest.builder()
-                .email("sayani@example.com")
+                .email("ghoshsayani008@gmail.com")
                 .password("NewSecurePassword@2026")
                 .deviceId("device-A")
                 .build();
@@ -87,13 +91,13 @@ class AuthFlowTests {
         assertEquals("OTP_REQUIRED", loginResponse.getStatus());
         assertTrue(loginResponse.getTwoFactorRequired());
 
-        // 5. Verify 2FA OTP for Device-A
-        User userBefore2FA = userRepository.findByEmail("sayani@example.com").orElseThrow();
+        // 5. Verify 2FA OTP for Device-A -> Issues 30-day token
+        User userBefore2FA = userRepository.findByEmail("ghoshsayani008@gmail.com").orElseThrow();
         String twoFaOtp = userBefore2FA.getCurrentOtp();
         assertNotNull(twoFaOtp);
 
         VerifyOtpRequest verifyOtpRequest = VerifyOtpRequest.builder()
-                .email("sayani@example.com")
+                .email("ghoshsayani008@gmail.com")
                 .otp(twoFaOtp)
                 .deviceId("device-A")
                 .build();
@@ -101,21 +105,30 @@ class AuthFlowTests {
         AuthResponse verifyResponse = authService.verifyOtp(verifyOtpRequest);
         assertEquals("SUCCESS", verifyResponse.getStatus());
         assertNotNull(verifyResponse.getToken());
+        assertTrue(jwtService.isTokenValid(verifyResponse.getToken()));
 
-        // 6. Login again from Device-A (Trusted -> Reuses existing 30-day token without regenerating)
+        // 6. Login from Recognized Device-A (Credentials) -> Returns only the 6 required fields
         AuthResponse directLoginResponse = authService.login(loginRequest);
-        assertEquals("SUCCESS", directLoginResponse.getStatus());
-        assertNotNull(directLoginResponse.getToken());
-        assertEquals(verifyResponse.getToken(), directLoginResponse.getToken(), "Should return the same active token instead of generating a new one");
-        assertFalse(Boolean.TRUE.equals(directLoginResponse.getTwoFactorRequired()));
+        assertEquals("Sayani Ghosh", directLoginResponse.getName());
+        assertEquals("ghoshsayani008@gmail.com", directLoginResponse.getEmail());
+        assertEquals("ROLE_USER", directLoginResponse.getRole());
+        assertEquals("Authentication successful (Recognized Device)", directLoginResponse.getMessage());
+        assertEquals(false, directLoginResponse.getTwoFactorRequired());
+        assertEquals("device-A", directLoginResponse.getDeviceId());
+        assertNull(directLoginResponse.getToken()); // token is not re-returned in login
 
-        // 7. Verify /me (token-based session check)
-        AuthResponse meResponse = authService.getCurrentUser("sayani@example.com");
-        assertEquals("SUCCESS", meResponse.getStatus());
-        assertEquals(verifyResponse.getToken(), meResponse.getToken());
-        assertEquals("Sayani Ghosh", meResponse.getName());
-
-        // 8. Verify 30-day token expiration setting
-        assertEquals(30L * 24 * 60 * 60 * 1000L, com.sayani.secure_auth_api.security.JwtService.EXPIRATION_TIME);
+        // 7. Login using the 30-day token from verify-otp
+        LoginRequest tokenLoginRequest = LoginRequest.builder()
+                .token(verifyResponse.getToken())
+                .deviceId("device-A")
+                .build();
+        AuthResponse tokenLoginResponse = authService.login(tokenLoginRequest);
+        assertEquals("Sayani Ghosh", tokenLoginResponse.getName());
+        assertEquals("ghoshsayani008@gmail.com", tokenLoginResponse.getEmail());
+        assertEquals("ROLE_USER", tokenLoginResponse.getRole());
+        assertEquals("Authentication successful (Recognized Device)", tokenLoginResponse.getMessage());
+        assertEquals(false, tokenLoginResponse.getTwoFactorRequired());
+        assertEquals("device-A", tokenLoginResponse.getDeviceId());
+        assertNull(tokenLoginResponse.getToken());
     }
 }

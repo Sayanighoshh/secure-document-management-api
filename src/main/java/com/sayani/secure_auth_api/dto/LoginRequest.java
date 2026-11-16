@@ -1,6 +1,5 @@
 package com.sayani.secure_auth_api.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,10 +15,13 @@ public class LoginRequest {
     private String username;
     private String email;
 
-    @NotBlank(message = "Password cannot be blank")
+    // Credentials password (optional if logging in directly with token)
     private String password;
 
-    // Optional device identifier (e.g. "device-1", "my-laptop", or mobile ID)
+    // Optional: JWT token if logging in using token received from verify-login
+    private String token;
+
+    // Optional device identifier (e.g. "device-A", "device-1", or mobile ID)
     private String deviceId;
 
     public String getUsername() {

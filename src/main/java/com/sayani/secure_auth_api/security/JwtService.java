@@ -20,8 +20,8 @@ public class JwtService {
     // 256-bit cryptographic signing secret managed internally in code (no application.properties config needed)
     public static final String SECRET = "5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437";
 
-    // Expiration: 30 days (30 * 24 * 60 * 60 * 1000L = 2,592,000,000 ms)
-    public static final long EXPIRATION_TIME = 30L * 24 * 60 * 60 * 1000L;
+    // Expiration: 30 days (30 * 24 * 60 * 60 * 1000 ms = 2,592,000,000 ms)
+    public static final long EXPIRATION_TIME = 30L * 24L * 60L * 60L * 1000L;
 
     /**
      * Generate JWT based on login credentials (username and password)
@@ -99,12 +99,13 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        if (token == null || token.isBlank()) {
-            return false;
-        }
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    public boolean isTokenValid(String token) {
         try {
-            final String username = extractUsername(token);
-            return (username != null && username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+            return !isTokenExpired(token);
         } catch (Exception e) {
             return false;
         }

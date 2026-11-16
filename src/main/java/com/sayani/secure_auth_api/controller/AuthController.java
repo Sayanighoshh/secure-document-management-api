@@ -26,8 +26,14 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<AuthResponse> login(
+            @RequestBody(required = false) LoginRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        if (request == null) {
+            request = new LoginRequest();
+        }
+        return ResponseEntity.ok(authService.login(request, authHeader));
     }
 
     @PostMapping("/verify-otp")
@@ -43,16 +49,5 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<AuthResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(authService.resetPassword(request));
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser() {
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    java.util.Map.of("status", "UNAUTHORIZED", "message", "Bearer token is missing, expired, or invalid.")
-            );
-        }
-        return ResponseEntity.ok(authService.getCurrentUser(auth.getName()));
     }
 }

@@ -78,17 +78,53 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Authenticates login credentials. If login occurs from an unrecognized device,
-     * triggers Two-Factor Authentication and sends an OTP email.
-     */
     public AuthResponse login(LoginRequest request) {
-        String loginIdentifier = request.getUsername();
-        if (loginIdentifier == null || loginIdentifier.isBlank()) {
-            throw new IllegalArgumentException("Username or email is required");
+        return login(request, null);
+    }
+
+    /**
+     * Authenticates login:
+     * - If logging in via 30-day token (from verify-otp): validates token and returns recognized profile.
+     * - If logging in via credentials:
+     *     - If unrecognized device: triggers 2FA OTP email and returns OTP_REQUIRED.
+     *     - If recognized device: returns ONLY the 6 user profile fields requested.
+     */
+    public AuthResponse login(LoginRequest request, String authHeader) {
+        String requestedDevice = request != null ? request.getDeviceId() : "default-device";
+
+        // 1. Check if logging in via 30-day token (provided in body or Authorization header)
+        String token = request != null ? request.getToken() : null;
+        if ((token == null || token.isBlank()) && authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
         }
 
-        // 1. Authenticate user credentials (username/email and password)
+        if (token != null && !token.isBlank()) {
+            if (!jwtService.isTokenValid(token)) {
+                throw new IllegalArgumentException("Invalid or expired 30-day token. Please authenticate again.");
+            }
+            String tokenUsername = jwtService.extractUsername(token);
+            var user = userRepository.findByEmail(tokenUsername)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found for provided token."));
+
+            return AuthResponse.builder()
+                    .name(user.getName())
+                    .email(user.getEmail())
+                    .role(user.getRole().name())
+                    .message("Authentication successful (Recognized Device)")
+                    .twoFactorRequired(false)
+                    .deviceId(requestedDevice != null && !requestedDevice.isBlank() ? requestedDevice : user.getLastKnownDeviceId())
+                    .build();
+        }
+
+        // 2. Otherwise log in via credentials (username/email and password)
+        String loginIdentifier = request != null ? request.getUsername() : null;
+        if (loginIdentifier == null || loginIdentifier.isBlank()) {
+            throw new IllegalArgumentException("Username/email or valid token is required for login.");
+        }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Password is required for credentials login.");
+        }
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginIdentifier,
@@ -101,10 +137,9 @@ public class AuthService {
         var user = userRepository.findByEmail(loginIdentifier)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
 
-        String requestedDevice = request.getDeviceId();
         boolean isRecognizedDevice = user.getLastKnownDeviceId() != null && user.getLastKnownDeviceId().equals(requestedDevice);
 
-        // 2. Unrecognized device or first login -> Trigger Two-Factor Authentication (OTP)
+        // Unrecognized device or first login -> Trigger Two-Factor Authentication (OTP)
         if (!isRecognizedDevice && user.isTwoFactorEnabled()) {
             String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
             user.setCurrentOtp(otp);
@@ -124,33 +159,20 @@ public class AuthService {
                     .build();
         }
 
-        // 3. Recognized / trusted device -> Return active valid token (30 days) or generate new one
-        String jwtToken = user.getActiveToken();
-        if (jwtToken == null || !jwtService.isTokenValid(jwtToken, user)) {
-            jwtToken = jwtService.generateTokenFromCredentials(
-                    user.getUsername(),
-                    request.getPassword(),
-                    Map.of("role", user.getRole().name())
-            );
-            user.setActiveToken(jwtToken);
-            userRepository.save(user);
-        }
-
+        // Recognized / trusted device -> Return ONLY the 6 user profile fields
         return AuthResponse.builder()
-                .status("SUCCESS")
-                .token(jwtToken)
-                .tokenType("Bearer")
                 .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
-                .deviceId(requestedDevice)
-                .twoFactorRequired(false)
                 .message("Authentication successful (Recognized Device)")
+                .twoFactorRequired(false)
+                .deviceId(requestedDevice)
                 .build();
     }
 
     /**
-     * Verifies 2FA OTP for new/unrecognized device login and registers device.
+     * Verifies 2FA OTP for new/unrecognized device login, registers device,
+     * and issues a 30-day JWT Bearer token.
      */
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
         String loginIdentifier = request.getUsername();
@@ -175,17 +197,13 @@ public class AuthService {
         user.setLastKnownDeviceId(request.getDeviceId());
         user.setCurrentOtp(null);
         user.setOtpExpiryTime(null);
-
-        // Issue 30-day JWT token upon successful 2FA verification and store as active token
-        String jwtToken = user.getActiveToken();
-        if (jwtToken == null || !jwtService.isTokenValid(jwtToken, user)) {
-            jwtToken = jwtService.generateToken(
-                    Map.of("role", user.getRole().name()),
-                    user.getUsername()
-            );
-            user.setActiveToken(jwtToken);
-        }
         userRepository.save(user);
+
+        // Issue 30-day JWT token upon successful 2FA verification
+        var jwtToken = jwtService.generateToken(
+                Map.of("role", user.getRole().name()),
+                user.getUsername()
+        );
 
         return AuthResponse.builder()
                 .status("SUCCESS")
@@ -196,7 +214,7 @@ public class AuthService {
                 .role(user.getRole().name())
                 .deviceId(request.getDeviceId())
                 .twoFactorRequired(false)
-                .message("Two-Factor Authentication verified successfully. Device registered.")
+                .message("Two-Factor Authentication verified successfully. Device registered. 30-day access token issued.")
                 .build();
     }
 
@@ -249,9 +267,8 @@ public class AuthService {
             throw new IllegalArgumentException("Password reset OTP has expired. Please request a new OTP.");
         }
 
-        // Update with encoded new password and invalidate prior tokens for security
+        // Update with encoded new password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        user.setActiveToken(null);
         user.setCurrentOtp(null);
         user.setOtpExpiryTime(null);
         userRepository.save(user);
@@ -281,25 +298,5 @@ public class AuthService {
         }
         int randomNum = 10000 + SECURE_RANDOM.nextInt(90000);
         return firstName + "@" + randomNum;
-    }
-
-    /**
-     * Retrieves currently authenticated user details via active token.
-     */
-    public AuthResponse getCurrentUser(String email) {
-        var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + email));
-
-        return AuthResponse.builder()
-                .status("SUCCESS")
-                .token(user.getActiveToken())
-                .tokenType("Bearer")
-                .name(user.getName())
-                .email(user.getEmail())
-                .role(user.getRole().name())
-                .deviceId(user.getLastKnownDeviceId())
-                .twoFactorRequired(false)
-                .message("User authenticated successfully with Bearer token.")
-                .build();
     }
 }
