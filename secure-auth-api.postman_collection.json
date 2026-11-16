@@ -1,0 +1,212 @@
+{
+	"info": {
+		"_postman_id": "secure-auth-api-collection",
+		"name": "Secure Auth API (SSL, 2FA, OTP & JWT)",
+		"description": "Postman Collection for testing Secure Auth API with SSL/TLS, Credentials-based JWT, Registration Email, and Two-Factor Authentication (OTP).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Register User (Triggers Registration Email)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Sayani\",\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/register",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"register"
+					]
+				}
+			}
+		},
+		{
+			"name": "2. Login from Device-A (First Time -> Triggers OTP)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-A\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/login",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"login"
+					]
+				}
+			}
+		},
+		{
+			"name": "3. Verify OTP & Trust Device-A (Returns JWT)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"otp\": \"PASTE_6_DIGIT_OTP_HERE\",\n  \"deviceId\": \"device-A\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/verify-otp",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"verify-otp"
+					]
+				}
+			}
+		},
+		{
+			"name": "4. Login from Trusted Device-A (Direct Login -> Returns JWT)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-A\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/login",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"login"
+					]
+				}
+			}
+		},
+		{
+			"name": "5. Login from Different Device-B (Alerts & Sends OTP to User)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"sayani@example.com\",\n  \"password\": \"password123\",\n  \"deviceId\": \"device-B\"\n}"
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/auth/login",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"login"
+					]
+				}
+			}
+		},
+		{
+			"name": "6. Access Protected Endpoint (/demo/hello)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_JWT_TOKEN_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/demo/hello",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"demo",
+						"hello"
+					]
+				}
+			}
+		},
+		{
+			"name": "7. Access User Profile Endpoint (/demo/profile)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_JWT_TOKEN_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/demo/profile",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"demo",
+						"profile"
+					]
+				}
+			}
+		}
+	]
+}

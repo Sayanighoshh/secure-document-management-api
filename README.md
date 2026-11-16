@@ -1,17 +1,24 @@
-# Secure Auth REST API (Spring Boot & SSL/TLS & JWT)
+# Secure Auth REST API (Spring Boot & SSL/TLS, 2FA/OTP & JWT)
 
-A production-grade, secure authentication and authorization REST API built with **Spring Boot**, **Spring Security**, **JSON Web Tokens (JWT)**, and **HTTPS / SSL (TLS)** using an RSA PKCS#12 Keystore.
+A production-grade, secure authentication and authorization REST API built with **Spring Boot**, **Spring Security**, **Two-Factor Authentication (2FA / OTP)**, **Email Notification Service**, **JSON Web Tokens (JWT)**, and **HTTPS / SSL (TLS)** using an RSA PKCS#12 Keystore.
 
 ---
 
 ## 🚀 Key Features
 
 - **HTTPS / SSL (TLS) Encryption**: Server runs exclusively over HTTPS on port `8443` using a local PKCS#12 RSA keystore (`keystore.p12`).
+- **Two-Factor Authentication (2FA) & Device Recognition**:
+  - Automatically identifies user devices via `deviceId`.
+  - When logging in from a recognized/trusted device, direct JWT authentication is granted.
+  - When an unrecognized or different device attempts login, a cryptographically secure 6-digit OTP is generated (valid for 5 minutes) and dispatched to the registered user's email.
+- **Email Service**:
+  - **Account Registration**: Dispatches a welcome confirmation email with user credentials.
+  - **Security Alerts & OTP**: Sends real-time security alerts with the OTP code when new device logins are detected.
+  - In development/testing, all dispatched emails & OTP codes are logged prominently to the terminal console so testing is seamless even without an external SMTP server.
 - **Dynamic Credentials-Based JWT Authentication**:
-  - JWT tokens are generated dynamically upon user authentication using login credentials (username/email and password).
-  - No external `jwt.*` properties needed in `application.properties`.
+  - JWT tokens are generated dynamically upon user authentication without needing external static properties in `application.properties`.
 - **Spring Security Architecture**:
-  - `SecurityFilterChain` configuring stateless session policy.
+  - Stateless session policy (`SessionCreationPolicy.STATELESS`).
   - Custom `JwtAuthenticationFilter` validating Bearer tokens on protected endpoints.
   - `BCryptPasswordEncoder` for cryptographic password hashing.
   - Role-based authorization (`ROLE_USER`, `ROLE_ADMIN`).
@@ -25,25 +32,29 @@ A production-grade, secure authentication and authorization REST API built with 
 ```
 src/main/java/com/sayani/secure_auth_api/
 ├── controller/
-│   ├── AuthController.java      # Registration and Login endpoints
-│   └── DemoController.java      # Protected test endpoints (requires JWT)
+│   ├── AuthController.java          # /register, /login, and /verify-otp endpoints
+│   └── DemoController.java          # Protected test endpoints (requires JWT)
 ├── dto/
-│   ├── AuthResponse.java        # Standardized JWT response payload
-│   ├── LoginRequest.java        # Login DTO with validation (accepts username/email & password)
-│   └── RegisterRequest.java     # User registration DTO
+│   ├── AuthResponse.java            # Standardized response payload (status, token, 2FA flag)
+│   ├── LoginRequest.java            # Login DTO with optional deviceId
+│   ├── RegisterRequest.java         # User registration DTO
+│   └── VerifyOtpRequest.java        # 2FA OTP verification DTO
 ├── entity/
-│   ├── Role.java                # User role enum (ROLE_USER, ROLE_ADMIN)
-│   └── User.java                # User JPA Entity (implements UserDetails)
+│   ├── Role.java                    # User role enum (ROLE_USER, ROLE_ADMIN)
+│   └── User.java                    # User JPA Entity (implements UserDetails, device & OTP tracking)
 ├── exception/
-│   └── GlobalExceptionHandler.java # Centralized error handling
+│   └── GlobalExceptionHandler.java  # Centralized error handling
 ├── repository/
-│   └── UserRepository.java      # Spring Data JPA Repository
+│   └── UserRepository.java          # Spring Data JPA Repository
 ├── security/
-│   ├── ApplicationConfig.java   # PasswordEncoder, UserDetailsService, AuthManager
+│   ├── ApplicationConfig.java       # PasswordEncoder, UserDetailsService, AuthManager
 │   ├── JwtAuthenticationFilter.java # OncePerRequestFilter for Bearer token validation
-│   ├── JwtService.java          # JJWT token generation and validation service
-│   └── SecurityConfig.java      # Spring Security Filter Chain configuration
-└── SecureAuthApiApplication.java # Spring Boot main entry point
+│   ├── JwtService.java              # JJWT token generation and validation service
+│   └── SecurityConfig.java          # Spring Security Filter Chain configuration
+├── service/
+│   ├── AuthService.java             # Core authentication, device check & OTP logic
+│   └── EmailService.java            # Email dispatch service with console fallback
+└── SecureAuthApiApplication.java    # Spring Boot main entry point
 ```
 
 ---
@@ -51,7 +62,10 @@ src/main/java/com/sayani/secure_auth_api/
 ## ⚙️ Configuration (`src/main/resources/application.properties`)
 
 ```properties
-# SSL / HTTPS Configuration
+# Application Name
+spring.application.name=secure-auth-api
+
+# SSL / HTTPS Configuration (Keystore generated via keytool)
 server.port=8443
 server.ssl.enabled=true
 server.ssl.key-store=classpath:keystore.p12
@@ -59,7 +73,7 @@ server.ssl.key-store-password=password123
 server.ssl.key-store-type=PKCS12
 server.ssl.key-alias=authkeystore
 
-# Database Configuration (H2 In-Memory)
+# In-Memory H2 Database
 spring.datasource.url=jdbc:h2:mem:authdb
 spring.datasource.driver-class-name=org.h2.Driver
 spring.datasource.username=sa
@@ -73,12 +87,13 @@ spring.h2.console.path=/h2-console
 
 ---
 
-## 🧪 Testing the API
+## 🧪 Postman & cURL Testing Workflow
 
 > **Note on Self-Signed SSL Certificate:**
 > Because the keystore uses a self-signed certificate for `localhost`, add `-k` or `--insecure` with `curl`, or in **Postman Settings -> General -> Turn OFF "SSL certificate verification"**.
+> You can also import the provided **`secure-auth-api.postman_collection.json`** directly into Postman!
 
-### 1. Register a New User
+### Step 1: Register User (Triggers Registration Email)
 ```bash
 curl -k -X POST https://localhost:8443/api/v1/auth/register \
   -H "Content-Type: application/json" \
@@ -88,46 +103,106 @@ curl -k -X POST https://localhost:8443/api/v1/auth/register \
     "password": "password123"
   }'
 ```
-
 **Response (`201 Created`):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "tokenType": "Bearer",
+  "status": "REGISTERED",
   "name": "Sayani",
   "email": "sayani@example.com",
   "role": "ROLE_USER",
-  "message": "User registered successfully"
+  "message": "User registered successfully. Credentials sent to registered email."
 }
 ```
 
 ---
 
-### 2. Login (Credentials-Based JWT Generation)
+### Step 2: Login from Device-A (First Time -> 2FA Triggered)
 ```bash
 curl -k -X POST https://localhost:8443/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "sayani@example.com",
-    "password": "password123"
+    "password": "password123",
+    "deviceId": "device-A"
   }'
 ```
+**Response:**
+```json
+{
+  "status": "OTP_REQUIRED",
+  "email": "sayani@example.com",
+  "name": "Sayani",
+  "deviceId": "device-A",
+  "twoFactorRequired": true,
+  "message": "Unrecognized device detected. A 6-digit OTP has been sent to your registered email."
+}
+```
+*(Check your console/terminal for the OTP code banner)*
 
 ---
 
-### 3. Access Protected Endpoint (Without Token -> `403 Forbidden`)
+### Step 3: Verify OTP & Register Device-A (Returns JWT)
 ```bash
-curl -k -X GET https://localhost:8443/api/v1/demo/hello
+curl -k -X POST https://localhost:8443/api/v1/auth/verify-otp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "sayani@example.com",
+    "otp": "<6_DIGIT_OTP_FROM_CONSOLE>",
+    "deviceId": "device-A"
+  }'
+```
+**Response (`200 OK`):**
+```json
+{
+  "status": "SUCCESS",
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "name": "Sayani",
+  "email": "sayani@example.com",
+  "role": "ROLE_USER",
+  "deviceId": "device-A",
+  "twoFactorRequired": false,
+  "message": "Two-Factor Authentication verified successfully. Device registered."
+}
 ```
 
 ---
 
-### 4. Access Protected Endpoint (With Token -> `200 OK`)
+### Step 4: Login Again from Recognized Device-A (Direct Login -> Returns JWT)
+```bash
+curl -k -X POST https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "sayani@example.com",
+    "password": "password123",
+    "deviceId": "device-A"
+  }'
+```
+**Response (`200 OK`):**
+Directly returns JWT without requiring OTP!
+
+---
+
+### Step 5: Someone Else Trying to Login from Device-B (Alerts & Sends OTP)
+```bash
+curl -k -X POST https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "sayani@example.com",
+    "password": "password123",
+    "deviceId": "device-B"
+  }'
+```
+**Response:**
+Returns `OTP_REQUIRED` and dispatches a security alert with OTP to the user's registered email!
+
+---
+
+### Step 6: Access Protected Endpoint
 ```bash
 curl -k -X GET https://localhost:8443/api/v1/demo/hello \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..."
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
 ```
-
 **Response (`200 OK`):**
 ```json
 {

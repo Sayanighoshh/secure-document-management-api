@@ -39,6 +39,20 @@ public class User implements UserDetails {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // 2FA and Device Tracking fields
+    @Column(name = "last_known_device_id")
+    private String lastKnownDeviceId;
+
+    @Column(name = "current_otp")
+    private String currentOtp;
+
+    @Column(name = "otp_expiry_time")
+    private LocalDateTime otpExpiryTime;
+
+    @Column(name = "two_factor_enabled")
+    @Builder.Default
+    private boolean twoFactorEnabled = true;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

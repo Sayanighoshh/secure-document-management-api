@@ -19,10 +19,20 @@ public class LoginRequest {
     @NotBlank(message = "Password cannot be blank")
     private String password;
 
+    // Optional device identifier (e.g. "device-1", "my-laptop", or mobile ID)
+    private String deviceId;
+
     public String getUsername() {
         if (username != null && !username.isBlank()) {
             return username;
         }
         return email;
+    }
+
+    public String getDeviceId() {
+        if (deviceId != null && !deviceId.isBlank()) {
+            return deviceId;
+        }
+        return "default-device";
     }
 }
