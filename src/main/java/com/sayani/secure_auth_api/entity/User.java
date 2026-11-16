@@ -49,6 +49,9 @@ public class User implements UserDetails {
     @Column(name = "otp_expiry_time")
     private LocalDateTime otpExpiryTime;
 
+    @Column(name = "active_token", length = 1000)
+    private String activeToken;
+
     @Column(name = "two_factor_enabled")
     @Builder.Default
     private boolean twoFactorEnabled = true;

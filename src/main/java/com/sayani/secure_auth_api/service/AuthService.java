@@ -124,12 +124,17 @@ public class AuthService {
                     .build();
         }
 
-        // 3. Recognized / trusted device -> Directly issue JWT
-        var jwtToken = jwtService.generateTokenFromCredentials(
-                user.getUsername(),
-                request.getPassword(),
-                Map.of("role", user.getRole().name())
-        );
+        // 3. Recognized / trusted device -> Return active valid token (30 days) or generate new one
+        String jwtToken = user.getActiveToken();
+        if (jwtToken == null || !jwtService.isTokenValid(jwtToken, user)) {
+            jwtToken = jwtService.generateTokenFromCredentials(
+                    user.getUsername(),
+                    request.getPassword(),
+                    Map.of("role", user.getRole().name())
+            );
+            user.setActiveToken(jwtToken);
+            userRepository.save(user);
+        }
 
         return AuthResponse.builder()
                 .status("SUCCESS")
@@ -170,13 +175,17 @@ public class AuthService {
         user.setLastKnownDeviceId(request.getDeviceId());
         user.setCurrentOtp(null);
         user.setOtpExpiryTime(null);
-        userRepository.save(user);
 
-        // Issue JWT token upon successful 2FA verification
-        var jwtToken = jwtService.generateToken(
-                Map.of("role", user.getRole().name()),
-                user.getUsername()
-        );
+        // Issue 30-day JWT token upon successful 2FA verification and store as active token
+        String jwtToken = user.getActiveToken();
+        if (jwtToken == null || !jwtService.isTokenValid(jwtToken, user)) {
+            jwtToken = jwtService.generateToken(
+                    Map.of("role", user.getRole().name()),
+                    user.getUsername()
+            );
+            user.setActiveToken(jwtToken);
+        }
+        userRepository.save(user);
 
         return AuthResponse.builder()
                 .status("SUCCESS")
@@ -240,8 +249,9 @@ public class AuthService {
             throw new IllegalArgumentException("Password reset OTP has expired. Please request a new OTP.");
         }
 
-        // Update with encoded new password
+        // Update with encoded new password and invalidate prior tokens for security
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setActiveToken(null);
         user.setCurrentOtp(null);
         user.setOtpExpiryTime(null);
         userRepository.save(user);
@@ -271,5 +281,25 @@ public class AuthService {
         }
         int randomNum = 10000 + SECURE_RANDOM.nextInt(90000);
         return firstName + "@" + randomNum;
+    }
+
+    /**
+     * Retrieves currently authenticated user details via active token.
+     */
+    public AuthResponse getCurrentUser(String email) {
+        var user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + email));
+
+        return AuthResponse.builder()
+                .status("SUCCESS")
+                .token(user.getActiveToken())
+                .tokenType("Bearer")
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .deviceId(user.getLastKnownDeviceId())
+                .twoFactorRequired(false)
+                .message("User authenticated successfully with Bearer token.")
+                .build();
     }
 }

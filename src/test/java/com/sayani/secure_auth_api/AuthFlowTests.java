@@ -102,10 +102,20 @@ class AuthFlowTests {
         assertEquals("SUCCESS", verifyResponse.getStatus());
         assertNotNull(verifyResponse.getToken());
 
-        // 6. Login again from Device-A (Trusted -> Direct login with JWT)
+        // 6. Login again from Device-A (Trusted -> Reuses existing 30-day token without regenerating)
         AuthResponse directLoginResponse = authService.login(loginRequest);
         assertEquals("SUCCESS", directLoginResponse.getStatus());
         assertNotNull(directLoginResponse.getToken());
+        assertEquals(verifyResponse.getToken(), directLoginResponse.getToken(), "Should return the same active token instead of generating a new one");
         assertFalse(Boolean.TRUE.equals(directLoginResponse.getTwoFactorRequired()));
+
+        // 7. Verify /me (token-based session check)
+        AuthResponse meResponse = authService.getCurrentUser("sayani@example.com");
+        assertEquals("SUCCESS", meResponse.getStatus());
+        assertEquals(verifyResponse.getToken(), meResponse.getToken());
+        assertEquals("Sayani Ghosh", meResponse.getName());
+
+        // 8. Verify 30-day token expiration setting
+        assertEquals(30L * 24 * 60 * 60 * 1000L, com.sayani.secure_auth_api.security.JwtService.EXPIRATION_TIME);
     }
 }
