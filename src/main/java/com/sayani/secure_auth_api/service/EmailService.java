@@ -2,6 +2,7 @@ package com.sayani.secure_auth_api.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,9 @@ public class EmailService {
 
     @Autowired(required = false)
     private JavaMailSender mailSender;
+
+    @Value("${spring.mail.username:}")
+    private String senderEmail;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -129,6 +133,9 @@ public class EmailService {
         if (mailSender != null) {
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
+                if (senderEmail != null && !senderEmail.isBlank()) {
+                    message.setFrom(senderEmail);
+                }
                 message.setTo(toEmail);
                 message.setSubject(subject);
                 message.setText(body);
