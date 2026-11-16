@@ -84,15 +84,67 @@ public class AuthService {
 
     /**
      * Authenticates login:
-     * - If logging in via 30-day token (from verify-otp): validates token and returns recognized profile.
-     * - If logging in via credentials:
+     * - If user provides credentials (email/password in body): authenticates credentials.
      *     - If unrecognized device: triggers 2FA OTP email and returns OTP_REQUIRED.
      *     - If recognized device: returns ONLY the 6 user profile fields requested.
+     * - If user logs in via 30-day token (without password): validates token and returns recognized profile.
      */
     public AuthResponse login(LoginRequest request, String authHeader) {
         String requestedDevice = request != null ? request.getDeviceId() : "default-device";
 
-        // 1. Check if logging in via 30-day token (provided in body or Authorization header)
+        // Case A: Credentials-based login (email/username and password in request body)
+        if (request != null && request.getPassword() != null && !request.getPassword().isBlank()) {
+            String loginIdentifier = request.getUsername();
+            if (loginIdentifier == null || loginIdentifier.isBlank()) {
+                throw new IllegalArgumentException("Username or email is required for credentials login.");
+            }
+
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginIdentifier,
+                            request.getPassword()
+                    )
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            var user = userRepository.findByEmail(loginIdentifier)
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+
+            boolean isRecognizedDevice = user.getLastKnownDeviceId() != null && user.getLastKnownDeviceId().equals(requestedDevice);
+
+            // Unrecognized device or first login -> Trigger Two-Factor Authentication (OTP)
+            if (!isRecognizedDevice && user.isTwoFactorEnabled()) {
+                String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+                user.setCurrentOtp(otp);
+                user.setOtpExpiryTime(LocalDateTime.now().plusMinutes(5));
+                userRepository.save(user);
+
+                // Send OTP alert email to the registered user
+                emailService.sendOtpEmail(user.getEmail(), user.getName(), otp, requestedDevice);
+
+                return AuthResponse.builder()
+                        .status("OTP_REQUIRED")
+                        .email(user.getEmail())
+                        .name(user.getName())
+                        .twoFactorRequired(true)
+                        .deviceId(requestedDevice)
+                        .message("Unrecognized device detected. A 6-digit OTP has been sent to your registered email.")
+                        .build();
+            }
+
+            // Recognized / trusted device -> Return ONLY the 6 user profile fields
+            return AuthResponse.builder()
+                    .name(user.getName())
+                    .email(user.getEmail())
+                    .role(user.getRole().name())
+                    .message("Authentication successful (Recognized Device)")
+                    .twoFactorRequired(false)
+                    .deviceId(requestedDevice)
+                    .build();
+        }
+
+        // Case B: Token-based login (token provided in body or Authorization header)
         String token = request != null ? request.getToken() : null;
         if ((token == null || token.isBlank()) && authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7).trim();
@@ -116,58 +168,7 @@ public class AuthService {
                     .build();
         }
 
-        // 2. Otherwise log in via credentials (username/email and password)
-        String loginIdentifier = request != null ? request.getUsername() : null;
-        if (loginIdentifier == null || loginIdentifier.isBlank()) {
-            throw new IllegalArgumentException("Username/email or valid token is required for login.");
-        }
-        if (request.getPassword() == null || request.getPassword().isBlank()) {
-            throw new IllegalArgumentException("Password is required for credentials login.");
-        }
-
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginIdentifier,
-                        request.getPassword()
-                )
-        );
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        var user = userRepository.findByEmail(loginIdentifier)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
-
-        boolean isRecognizedDevice = user.getLastKnownDeviceId() != null && user.getLastKnownDeviceId().equals(requestedDevice);
-
-        // Unrecognized device or first login -> Trigger Two-Factor Authentication (OTP)
-        if (!isRecognizedDevice && user.isTwoFactorEnabled()) {
-            String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
-            user.setCurrentOtp(otp);
-            user.setOtpExpiryTime(LocalDateTime.now().plusMinutes(5));
-            userRepository.save(user);
-
-            // Send OTP alert email to the registered user
-            emailService.sendOtpEmail(user.getEmail(), user.getName(), otp, requestedDevice);
-
-            return AuthResponse.builder()
-                    .status("OTP_REQUIRED")
-                    .email(user.getEmail())
-                    .name(user.getName())
-                    .twoFactorRequired(true)
-                    .deviceId(requestedDevice)
-                    .message("Unrecognized device detected. A 6-digit OTP has been sent to your registered email.")
-                    .build();
-        }
-
-        // Recognized / trusted device -> Return ONLY the 6 user profile fields
-        return AuthResponse.builder()
-                .name(user.getName())
-                .email(user.getEmail())
-                .role(user.getRole().name())
-                .message("Authentication successful (Recognized Device)")
-                .twoFactorRequired(false)
-                .deviceId(requestedDevice)
-                .build();
+        throw new IllegalArgumentException("Please provide email and password, or a valid 30-day Bearer token to login.");
     }
 
     /**
