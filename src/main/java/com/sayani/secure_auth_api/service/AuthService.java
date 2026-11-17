@@ -8,6 +8,7 @@ import com.sayani.secure_auth_api.dto.ResetPasswordRequest;
 import com.sayani.secure_auth_api.dto.VerifyOtpRequest;
 import com.sayani.secure_auth_api.entity.Role;
 import com.sayani.secure_auth_api.entity.User;
+import com.sayani.secure_auth_api.exception.CustomMessageException;
 import com.sayani.secure_auth_api.repository.UserRepository;
 import com.sayani.secure_auth_api.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -44,11 +45,11 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         String email = request.getEmail();
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Username or email is required");
+            throw new CustomMessageException("Username or email is required");
         }
 
         if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("User is already registered: " + email);
+            throw new CustomMessageException("User is already registered: " + email);
         }
 
         String rawPassword = request.getPassword();
@@ -96,7 +97,7 @@ public class AuthService {
         if (request != null && request.getPassword() != null && !request.getPassword().isBlank()) {
             String loginIdentifier = request.getUsername();
             if (loginIdentifier == null || loginIdentifier.isBlank()) {
-                throw new IllegalArgumentException("Username or email is required for credentials login.");
+                throw new CustomMessageException("Username or email is required for credentials login.");
             }
 
             Authentication authentication = authenticationManager.authenticate(
@@ -109,7 +110,7 @@ public class AuthService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             var user = userRepository.findByEmail(loginIdentifier)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+                    .orElseThrow(() -> new CustomMessageException("Invalid username or password"));
 
             boolean isRecognizedDevice = user.getLastKnownDeviceId() != null && user.getLastKnownDeviceId().equals(requestedDevice);
 
@@ -152,11 +153,11 @@ public class AuthService {
 
         if (token != null && !token.isBlank()) {
             if (!jwtService.isTokenValid(token)) {
-                throw new IllegalArgumentException("Invalid or expired 30-day token. Please authenticate again.");
+                throw new CustomMessageException("Invalid or expired 30-day token. Please authenticate again.");
             }
             String tokenUsername = jwtService.extractUsername(token);
             var user = userRepository.findByEmail(tokenUsername)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found for provided token."));
+                    .orElseThrow(() -> new CustomMessageException("User not found for provided token."));
 
             return AuthResponse.builder()
                     .name(user.getName())
@@ -168,7 +169,7 @@ public class AuthService {
                     .build();
         }
 
-        throw new IllegalArgumentException("Please provide email and password, or a valid 30-day Bearer token to login.");
+        throw new CustomMessageException("Please provide email and password, or a valid 30-day Bearer token to login.");
     }
 
     /**
@@ -178,20 +179,20 @@ public class AuthService {
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
         String loginIdentifier = request.getUsername();
         if (loginIdentifier == null || loginIdentifier.isBlank()) {
-            throw new IllegalArgumentException("Username or email is required");
+            throw new CustomMessageException("Username or email is required");
         }
 
         var user = userRepository.findByEmail(loginIdentifier)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + loginIdentifier));
+                .orElseThrow(() -> new CustomMessageException("User not found with email: " + loginIdentifier));
 
         // Validate OTP existence
         if (user.getCurrentOtp() == null || !user.getCurrentOtp().equals(request.getOtp().trim())) {
-            throw new IllegalArgumentException("Invalid OTP code provided.");
+            throw new CustomMessageException("Invalid OTP code provided.");
         }
 
         // Validate OTP expiry
         if (user.getOtpExpiryTime() == null || user.getOtpExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("OTP code has expired. Please initiate login again.");
+            throw new CustomMessageException("OTP code has expired. Please initiate login again.");
         }
 
         // Mark device as recognized and clear the used OTP
@@ -225,11 +226,11 @@ public class AuthService {
     public AuthResponse forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail();
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Registered email or username is required.");
+            throw new CustomMessageException("Registered email or username is required.");
         }
 
         var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("No account found registered with email: " + email));
+                .orElseThrow(() -> new CustomMessageException("No account found registered with email: " + email));
 
         // Generate 6-digit OTP code for password reset
         String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
@@ -254,18 +255,18 @@ public class AuthService {
     public AuthResponse resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail();
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Registered email or username is required.");
+            throw new CustomMessageException("Registered email or username is required.");
         }
 
         var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("No account found registered with email: " + email));
+                .orElseThrow(() -> new CustomMessageException("No account found registered with email: " + email));
 
         if (user.getCurrentOtp() == null || !user.getCurrentOtp().equals(request.getOtp().trim())) {
-            throw new IllegalArgumentException("Invalid password reset OTP code.");
+            throw new CustomMessageException("Invalid password reset OTP code.");
         }
 
         if (user.getOtpExpiryTime() == null || user.getOtpExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Password reset OTP has expired. Please request a new OTP.");
+            throw new CustomMessageException("Password reset OTP has expired. Please request a new OTP.");
         }
 
         // Update with encoded new password

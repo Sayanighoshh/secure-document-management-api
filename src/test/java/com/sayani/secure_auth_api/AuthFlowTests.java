@@ -7,6 +7,8 @@ import com.sayani.secure_auth_api.dto.RegisterRequest;
 import com.sayani.secure_auth_api.dto.ResetPasswordRequest;
 import com.sayani.secure_auth_api.dto.VerifyOtpRequest;
 import com.sayani.secure_auth_api.entity.User;
+import com.sayani.secure_auth_api.exception.CustomMessageException;
+import com.sayani.secure_auth_api.exception.GlobalExceptionHandler;
 import com.sayani.secure_auth_api.repository.UserRepository;
 import com.sayani.secure_auth_api.security.JwtService;
 import com.sayani.secure_auth_api.service.AuthService;
@@ -14,6 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,6 +34,9 @@ class AuthFlowTests {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private GlobalExceptionHandler globalExceptionHandler;
 
     @BeforeEach
     void setUp() {
@@ -130,5 +139,44 @@ class AuthFlowTests {
         assertEquals(false, tokenLoginResponse.getTwoFactorRequired());
         assertEquals("device-A", tokenLoginResponse.getDeviceId());
         assertNull(tokenLoginResponse.getToken());
+    }
+
+    @Test
+    void testCustomMessageException_returnsHttp200_withProperMessage() {
+        // Verify CustomMessageException handled by GlobalExceptionHandler returns HTTP 200 OK
+        CustomMessageException ex = new CustomMessageException("Invalid or expired 30-day token. Please authenticate again.");
+        ResponseEntity<Map<String, Object>> response = globalExceptionHandler.handleCustomMessageException(ex);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("FAIL", response.getBody().get("status"));
+        assertEquals("Invalid or expired 30-day token. Please authenticate again.", response.getBody().get("message"));
+        assertEquals(false, response.getBody().get("success"));
+        assertNotNull(response.getBody().get("timestamp"));
+    }
+
+    @Test
+    void testDuplicateRegistration_throwsCustomMessageException() {
+        RegisterRequest registerRequest = RegisterRequest.builder()
+                .name("Sayani Ghosh")
+                .email("ghoshsayani008@gmail.com")
+                .build();
+
+        authService.register(registerRequest);
+
+        // Attempting to register again should throw CustomMessageException
+        CustomMessageException ex = assertThrows(CustomMessageException.class, () -> {
+            authService.register(registerRequest);
+        });
+
+        assertTrue(ex.getMessage().contains("User is already registered"));
+
+        // Passing it to GlobalExceptionHandler returns HTTP 200 OK
+        ResponseEntity<Map<String, Object>> response = globalExceptionHandler.handleCustomMessageException(ex);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("FAIL", response.getBody().get("status"));
+        assertTrue(response.getBody().get("message").toString().contains("User is already registered"));
     }
 }

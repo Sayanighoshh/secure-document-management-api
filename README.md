@@ -36,6 +36,8 @@ A production-grade, secure authentication and authorization REST API built with 
   - **Password Changed Notification**: Real-time security confirmation notification upon password update.
   - **Security Alerts & 2FA OTP**: Sends real-time security alerts with the OTP code when new device logins are detected.
   - Built-in console fallback for zero-configuration local testing + direct support for Gmail SMTP and Mailtrap.
+- **Custom Exception Handling (`CustomMessageException`)**:
+  - All business and authentication exceptions return **HTTP 200 OK** with a structured, user-friendly JSON message (`status: "FAIL"`, `message: "..."`, `success: false`), preventing client-side network crashes while providing descriptive error context.
 - **In-Memory H2 Database**: Automated entity schema generation with JPA / Hibernate.
 
 ---
@@ -58,7 +60,8 @@ src/main/java/com/sayani/secure_auth_api/
 │   ├── Role.java                    # User role enum (ROLE_USER, ROLE_ADMIN)
 │   └── User.java                    # User JPA Entity (implements UserDetails, device & OTP tracking)
 ├── exception/
-│   └── GlobalExceptionHandler.java  # Centralized error handling
+│   ├── CustomMessageException.java  # Custom exception returning HTTP 200 with proper message
+│   └── GlobalExceptionHandler.java  # Centralized error handling returning HTTP 200
 ├── repository/
 │   └── UserRepository.java          # Spring Data JPA Repository
 ├── security/
