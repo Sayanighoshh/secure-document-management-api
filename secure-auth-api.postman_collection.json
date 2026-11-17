@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "secure-auth-api-collection",
-		"name": "Secure Auth API (SSL, 2FA, OTP, 30-Day Token & Profile Login)",
-		"description": "Comprehensive Postman collection for Secure Auth API featuring SSL/TLS, auto-generated registration credentials, Forgot/Reset Password workflows, 30-day token issuance via OTP verification, and lightweight login response.",
+		"name": "Secure Auth & Document Management API",
+		"description": "Comprehensive Postman collection for Secure Auth & Document Management API featuring SSL/TLS, 30-day JWT Bearer tokens, 2FA/OTP, and Secure Document Upload/Download with Role-Based Access Control (RBAC).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -298,6 +298,146 @@
 						"v1",
 						"demo",
 						"profile"
+					]
+				}
+			}
+		},
+		{
+			"name": "11. Upload Document (Multipart Form Data - Requires JWT)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_30_DAY_JWT_HERE"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": ""
+						}
+					]
+				},
+				"url": {
+					"raw": "https://localhost:8443/api/v1/documents/upload",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"documents",
+						"upload"
+					]
+				}
+			}
+		},
+		{
+			"name": "12. List Documents (RBAC - Requires JWT)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_30_DAY_JWT_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/documents",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"documents"
+					]
+				}
+			}
+		},
+		{
+			"name": "13. Get Document Metadata by ID (Requires JWT)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_30_DAY_JWT_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/documents/1",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"documents",
+						"1"
+					]
+				}
+			}
+		},
+		{
+			"name": "14. Download Document by ID (Streams File - Requires JWT)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_30_DAY_JWT_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/documents/download/1",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"documents",
+						"download",
+						"1"
+					]
+				}
+			}
+		},
+		{
+			"name": "15. Delete Document by ID (RBAC - Requires JWT)",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer PASTE_YOUR_30_DAY_JWT_HERE"
+					}
+				],
+				"url": {
+					"raw": "https://localhost:8443/api/v1/documents/1",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8443",
+					"path": [
+						"api",
+						"v1",
+						"documents",
+						"1"
 					]
 				}
 			}
