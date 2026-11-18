@@ -10,6 +10,7 @@ import com.sayani.secure_auth_api.repository.UserRepository;
 import com.sayani.secure_auth_api.service.DocumentService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -34,8 +35,12 @@ import java.util.stream.Collectors;
 @Transactional
 public class DocumentServiceImpl implements DocumentService {
 
-    private final DocumentRepository documentRepository;
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
     private final UserRepository userRepository;
+
     private final Path fileStorageLocation;
 
     public DocumentServiceImpl(

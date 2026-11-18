@@ -1,0 +1,396 @@
+{
+  "info": {
+    "_postman_id": "a8260e98-37c7-4f3f-8a71-13183631a62e",
+    "name": "Secure_auth_api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "30827670"
+  },
+  "item": [
+    {
+      "name": "1. Register User (Auto-Generates Password & Sends Email)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"name\": \"Sayani Ghosh\",\r\n  \"email\": \"abc+sg@gmail.com\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/register",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Forgot Password (Dispatches Reset OTP)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"abc+sg@gmail.com\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/forgot-password",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "forgot-password"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Reset Password (Verify OTP & Set New Password)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"abc+sg@gmail.com\",\r\n  \"otp\": \"994511\",\r\n  \"newPassword\": \"SecurePassword@2026\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/reset-password",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "reset-password"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. First-Time Login (Device-A  → → Triggers 2FA OTP)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"abc+sg@gmail.com\",\r\n  \"password\": \"SecurePassword@2026\",\r\n  \"deviceId\": \"device-A\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/login",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Verify 2FA OTP (Registers Device & Issues 30-Day Token)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"email\": \"abc+sg@gmail.com\",\r\n    \"otp\": \"016668\",\r\n    \"deviceId\": \"device-A\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/verify-otp",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "verify-otp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "6. Login from Trusted Device-A",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoiYWJjK3NnQGdtYWlsLmNvbSIsImlhdCI6MTc5NDk4OTIwOCwiZXhwIjoxNzk3NTgxMjA4fQ.XRnlvku3QQlyKRJfXQTnyW5rov5dV3b2FRWGH7ZP4nq0Tc5A10JrRYRMR-GbVOid",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"abc+sg@gmail.com\",\r\n  \"password\": \"SecurePassword@2026\",\r\n  \"deviceId\": \"device-A\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/auth/login",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Upload Document",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoiYWJjK3NnQGdtYWlsLmNvbSIsImlhdCI6MTc5NDk4OTIwOCwiZXhwIjoxNzk3NTgxMjA4fQ.XRnlvku3QQlyKRJfXQTnyW5rov5dV3b2FRWGH7ZP4nq0Tc5A10JrRYRMR-GbVOid",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": [
+                "/C:/Users/CONALAP/Downloads/blank.pdf"
+              ]
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://localhost:8443/api/v1/documents/upload",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "documents",
+            "upload"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "8. List All Documents",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoiYWJjK3NnQGdtYWlsLmNvbSIsImlhdCI6MTc5NDk4OTIwOCwiZXhwIjoxNzk3NTgxMjA4fQ.XRnlvku3QQlyKRJfXQTnyW5rov5dV3b2FRWGH7ZP4nq0Tc5A10JrRYRMR-GbVOid",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://localhost:8443/api/v1/documents/list-documens",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "documents",
+            "list-documens"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "9. Get Document Metadata by ID",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoiYWJjK3NnQGdtYWlsLmNvbSIsImlhdCI6MTc5NDk4OTIwOCwiZXhwIjoxNzk3NTgxMjA4fQ.XRnlvku3QQlyKRJfXQTnyW5rov5dV3b2FRWGH7ZP4nq0Tc5A10JrRYRMR-GbVOid",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://localhost:8443/api/v1/documents/get-document-by-id?id=2",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "documents",
+            "get-document-by-id"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10. Download document",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoiYWJjK3NnQGdtYWlsLmNvbSIsImlhdCI6MTc5NDk4OTIwOCwiZXhwIjoxNzk3NTgxMjA4fQ.XRnlvku3QQlyKRJfXQTnyW5rov5dV3b2FRWGH7ZP4nq0Tc5A10JrRYRMR-GbVOid",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://localhost:8443/api/v1/documents/download?id=2",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "documents",
+            "download"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "11. Delete Document",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzM4NCJ9.eyJyb2xlIjoiUk9MRV9VU0VSIiwic3ViIjoibmlkaGlnaG9zaDMxMituaWRoaUBnbWFpbC5jb20iLCJpYXQiOjE3OTQ5ODU5ODYsImV4cCI6MTc5NzU3Nzk4Nn0.PZWi4cD9h_OtMs1ieTLzd4e8j1u_b0QOofWrAwxPGNAGx_rWoWfHlzWew4_rf2IZ",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "https://localhost:8443/api/v1/documents/delete-document?id=2",
+          "protocol": "https",
+          "host": [
+            "localhost"
+          ],
+          "port": "8443",
+          "path": [
+            "api",
+            "v1",
+            "documents",
+            "delete-document"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

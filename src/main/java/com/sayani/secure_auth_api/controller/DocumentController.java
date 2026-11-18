@@ -4,6 +4,7 @@ import com.sayani.secure_auth_api.dto.DocumentResponse;
 import com.sayani.secure_auth_api.entity.Document;
 import com.sayani.secure_auth_api.service.DocumentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,17 +22,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DocumentController {
 
-    private final DocumentService documentService;
+    @Autowired
+    private DocumentService documentService;
 
     /**
      * Secure file upload endpoint.
      * Accessible by authenticated users with a valid JWT Bearer token.
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DocumentResponse> uploadDocument(
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication
-    ) {
+    public ResponseEntity<DocumentResponse> uploadDocument(@RequestParam("file") MultipartFile file, Authentication authentication) {
         String userEmail = authentication.getName();
         DocumentResponse response = documentService.uploadDocument(file, userEmail);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -42,11 +41,8 @@ public class DocumentController {
      * Streams the file from secure storage with original filename & MIME type headers.
      * Role-based access control: regular users can only download their own files; admins can download any.
      */
-    @GetMapping("/download/{id}")
-    public ResponseEntity<Resource> downloadDocument(
-            @PathVariable Long id,
-            Authentication authentication
-    ) {
+    @GetMapping("/download")
+    public ResponseEntity<Resource> downloadDocument(@RequestParam Long id, Authentication authentication) {
         String userEmail = authentication.getName();
         Document metadata = documentService.getDocumentMetadata(id, userEmail);
         Resource fileResource = documentService.downloadDocument(id, userEmail);
@@ -68,7 +64,7 @@ public class DocumentController {
      * List all documents accessible to the authenticated user.
      * Regular users see only their uploaded files; Admin users see all files.
      */
-    @GetMapping
+    @GetMapping("/list-documens")
     public ResponseEntity<List<DocumentResponse>> listDocuments(Authentication authentication) {
         String userEmail = authentication.getName();
         return ResponseEntity.ok(documentService.listDocuments(userEmail));
@@ -77,11 +73,8 @@ public class DocumentController {
     /**
      * Get document metadata by ID.
      */
-    @GetMapping("/{id}")
-    public ResponseEntity<DocumentResponse> getDocumentMetadata(
-            @PathVariable Long id,
-            Authentication authentication
-    ) {
+    @GetMapping("/get-document-by-id")
+    public ResponseEntity<DocumentResponse> getDocumentMetadata(@RequestParam Long id, Authentication authentication) {
         String userEmail = authentication.getName();
         Document doc = documentService.getDocumentMetadata(id, userEmail);
         DocumentResponse response = DocumentResponse.builder()
@@ -100,11 +93,8 @@ public class DocumentController {
      * Secure document deletion.
      * Regular users can delete their own files; Admins can delete any file.
      */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteDocument(
-            @PathVariable Long id,
-            Authentication authentication
-    ) {
+    @DeleteMapping("/delete-document")
+    public ResponseEntity<Map<String, Object>> deleteDocument(@RequestParam Long id, Authentication authentication) {
         String userEmail = authentication.getName();
         documentService.deleteDocument(id, userEmail);
         return ResponseEntity.ok(Map.of(
