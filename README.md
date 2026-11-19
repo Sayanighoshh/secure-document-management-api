@@ -179,3 +179,12 @@ The server starts over HTTPS at **`https://localhost:8443`**.
 
 ### Switching to PostgreSQL (Optional)
 In `src/main/resources/application.properties`, comment out the H2 datasource lines and uncomment the PostgreSQL configuration block with your local database credentials.
+
+---
+
+## 📄 License & Terms of Use
+
+Copyright (c) 2026 Sayani Ghosh. All rights reserved.
+
+This project is licensed under a **Proprietary License** for portfolio and evaluation purposes only. Unauthorized copying, redistribution, modification, commercial use, or re-publishing without express written permission is strictly prohibited. See the [LICENSE](LICENSE) file for complete details.
+
